@@ -1,10 +1,23 @@
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Create HTTP server and attach Socket.IO
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+
+io.on('connection', (socket) => {
+  console.log('Socket connected', socket.id);
+  socket.on('disconnect', () => console.log('Socket disconnected', socket.id));
+});
 
 // In-memory store: { token: { lat, lng, updatedAt } }
 const tokens = new Map();
@@ -62,10 +75,13 @@ app.post('/broadcast', async (req, res) => {
     if (resp.ok) sent += messages.length;
   }
 
+  // Also emit a real-time SOS event to all connected sockets (clients will filter by distance)
+  io.emit('sos', { lat, lng, radius, title, body, ts: Date.now() });
+
   res.json({ ok: true, sent });
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+server.listen(PORT, () => console.log(`Server listening on ${PORT}`));
 
 

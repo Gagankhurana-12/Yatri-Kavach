@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { useLocationContext } from './LocationContext';
 import { useMessaging } from './MessagingContext';
+import { io, Socket } from 'socket.io-client';
 
 type PushContextType = {
   pushToken: string | null;
@@ -33,6 +34,7 @@ export const PushProvider = ({ children }: { children: React.ReactNode }) => {
   const [pushToken, setPushToken] = useState<string | null>(null);
   const { coords, setCoords } = useLocationContext();
   const { addNearbyMessage } = useMessaging();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   const requestPermissions = async () => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
