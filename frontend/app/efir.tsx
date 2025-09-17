@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, FlatList, BackHandler, Platform } from "react-native";
 import { FileText, MapPin, Calendar, User, Phone, AlertCircle, History, Trash2 } from "lucide-react-native";
 import { useTheme } from "../components/ThemeContext";
 import { useAuth } from "../components/AuthContext";
@@ -63,6 +63,19 @@ export default function EFir() {
     
     initializeForm();
   }, [user]);
+
+  // Handle Android hardware back to navigate instead of exiting app
+  useEffect(() => {
+    const onBackPress = () => {
+      // Navigate back to previous screen (Emergency)
+      router.back();
+      return true; // prevent default behavior (exit app)
+    };
+    if (Platform.OS === 'android') {
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }
+  }, []);
 
   const getCurrentLocation = async () => {
     try {

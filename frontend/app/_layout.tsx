@@ -4,6 +4,8 @@ import { AuthProvider } from "../components/AuthContext";
 import { RiskScoreProvider } from "../components/RiskScoreContext";
 import { MessagingProvider } from "../components/MessagingContext";
 import { LanguageProvider } from "../components/LanguageContext";
+import { LocationProvider } from "../components/LocationContext";
+import { PushProvider } from "../components/PushContext";
 
 export default function Layout() {
   return (
@@ -12,7 +14,11 @@ export default function Layout() {
         <AuthProvider>
           <RiskScoreProvider>
             <MessagingProvider>
-              <Stack screenOptions={{ headerShown: false }} />
+              <LocationProvider>
+                <PushProvider>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </PushProvider>
+              </LocationProvider>
             </MessagingProvider>
           </RiskScoreProvider>
         </AuthProvider>

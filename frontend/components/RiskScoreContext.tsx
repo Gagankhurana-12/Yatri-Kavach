@@ -53,7 +53,7 @@ export const RiskScoreProvider = ({ children }: { children: React.ReactNode }) =
     {
       id: 'crowd',
       name: 'Crowd Density',
-      value: 60,
+      value: 40,
       weight: 20,
       status: 'medium',
       description: 'Number of people in vicinity - affects pickpocket and scam risks',

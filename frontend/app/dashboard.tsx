@@ -11,6 +11,8 @@ import {
   BackHandler,
   StatusBar,
   Pressable,
+  SafeAreaView,
+  Image,
 } from "react-native";
 import {
   MapPin,
@@ -36,25 +38,27 @@ import Emergency from "./emergency";
 import Messages from "./messages";
 import { useAuth } from "../components/AuthContext";
 import { useRiskScore } from "../components/RiskScoreContext";
+import { LinearGradient } from "expo-linear-gradient";
+// Using existing FreeMap component for mini preview below
 
 const ALERTS = [
   {
     id: 1,
-    icon: <CreditCard size={24} color="#f59e42" />,
-    title: "SIM Card Removed",
+    icon: <MapPin size={24} color="#ef4444" />,
+    title: "Unusual Location Change Detected",
     time: "2 min ago",
     description:
-      "Your SIM card was removed. This could indicate a potential security risk.",
-    priority: "High Priority",
-    priorityColor: "#fbbf24",
+      "Your device moved a significant distance in a short time while the app was active.",
+    priority: "Critical",
+    priorityColor: "#fca5a5",
   },
   {
     id: 2,
-    icon: <ShieldOff size={24} color="#ef4444" />,
-    title: "Entered Restricted Area",
+    icon: <MapPinOff size={24} color="#ef4444" />,
+    title: "Unsafe Zone Entered",
     time: "15 min ago",
     description:
-      "You have entered a restricted area. Please leave immediately to avoid potential issues.",
+      "Your current area has a high risk rating. Leave the area or use emergency options.",
     priority: "Critical",
     priorityColor: "#fca5a5",
   },
@@ -162,47 +166,68 @@ export default function Dashboard() {
     isDark ? "#232d23" : "#f6fff6",
   ];
 
+  const now = new Date();
+  const todayLabel = now.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor }]}>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={isDark ? "#181c20" : "#f7f8fa"}
+        translucent={false}
+      />
       {/* HOME TAB */}
       {activeTab === "home" && (
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Greeting */}
-          <View style={styles.greetingRow}>
-            <Text style={[styles.greeting, { color: textColor }]}>
-              Good morning, {user?.userName || "Guest User"}
-            </Text>
-            <TouchableOpacity
-              style={styles.avatar}
-              onPress={() => setActiveTab("profile")}
-              activeOpacity={0.7}
-            >
-              <User size={28} color="#2563eb" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Risk Score */}
-          <TouchableOpacity
-            style={[styles.riskCard, { backgroundColor: cardColor, ...cardShadow }]}
-            onPress={() => {
-              router.push("./risk-monitoring");
-            }}
-            activeOpacity={0.8}
+          {/* Header */}
+          <LinearGradient
+            colors={isDark ? ["#0b1220", "#111827"] : ["#e6f0ff", "#ffffff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.headerGradient, { ...cardShadow }]}
           >
-            <View style={[styles.riskCircle, { borderColor: riskCircle }]}>
-              <Text style={[styles.riskScore, { color: riskCircle }]}>
-                {riskScore}
-              </Text>
+            <View style={styles.headerContent}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.headerGreeting, { color: isDark ? "#ffffff" : "#0f172a" }]}>Welcome to Yatri Kavach</Text>
+                <Text style={[styles.headerSubtitle, { color: isDark ? "#cbd5e1" : "#334155" }]}>Stay safe. We’re watching your surroundings.</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.avatar}
+                onPress={() => setActiveTab("profile")}
+                activeOpacity={0.7}
+              >
+                <Image 
+                  source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }}
+                  style={styles.avatarImage}
+                />
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.riskLabel, { color: textColor }]}>
-              Risk Score
-            </Text>
-            <Text style={[styles.riskUpdate, { color: textSecondary }]}>
-              Tap to view details
-            </Text>
-          </TouchableOpacity>
 
-          {/* Actions */}
+            {/* Risk quick view */}
+            <TouchableOpacity
+              onPress={() => router.push("./risk-monitoring")}
+              activeOpacity={0.85}
+              style={styles.riskQuickWrapper}
+            >
+              <View style={[styles.ringOuter, { borderColor: riskCircle }]}> 
+                <View style={styles.ringInner}>
+                  <Text style={[styles.ringScore, { color: riskCircle }]}>{riskScore}</Text>
+                  <Text style={styles.ringLabel}>Risk</Text>
+                </View>
+              </View>
+              <View style={styles.ringMeta}>
+                <Text style={[styles.ringMetaTitle, { color: textColor }]}>Risk Score</Text>
+                <Text style={[styles.ringMetaSub, { color: textSecondary }]}>{getRiskLevel(riskScore).toUpperCase()} RISK, tap for details</Text>
+              </View>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Quick Actions */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: actionBtnColors[0], ...cardShadow }]}
@@ -234,78 +259,56 @@ export default function Dashboard() {
           </View>
 
           {/* Safety Status */}
-          <View
-            style={[styles.statusCard, { backgroundColor: cardColor, ...cardShadow }]}
-          >
-            <Text style={[styles.statusTitle, { color: textColor }]}>
-              Safety Status
-            </Text>
-            <Pressable
-              style={styles.statusRow}
-              onPress={() => setShowLocationModal(true)}
-            >
-              <MapPin size={18} color={iconActive} />
-              <Text style={[styles.statusLabel, { color: textSecondary }]}>
-                Current Location
-              </Text>
-              <Text
-                style={[styles.statusValue, { color: textColor, maxWidth: 170 }]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {address}
-              </Text>
-            </Pressable>
-            <View style={styles.statusRow}>
-              <Phone size={18} color="#e53935" />
-              <Text style={[styles.statusLabel, { color: textSecondary }]}>
-                Emergency Contacts
-              </Text>
-              <Text style={[styles.statusValue, { color: textColor }]}>
-                {emergencyContacts} active
-              </Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Users size={18} color="#16a34a" />
-              <Text style={[styles.statusLabel, { color: textSecondary }]}>
-                Nearby Tourists
-              </Text>
-              <Text style={[styles.statusValue, { color: textColor }]}>
-                {nearbyTourists} online
-              </Text>
+          <View style={[styles.locationCard, { backgroundColor: cardColor, ...cardShadow }]}>
+            <Text style={[styles.statusTitle, { color: textColor }]}>Your Location</Text>
+            <View style={styles.locationRow}>
+              <View style={styles.miniMap}>
+                <FreeMap style={{ flex: 1 }} compact />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Pressable style={styles.statusRow} onPress={() => setShowLocationModal(true)}>
+                  <MapPin size={18} color={iconActive} />
+                  <Text style={[styles.statusLabel, { color: textSecondary }]}>Current Location</Text>
+                  <Text style={[styles.statusValue, { color: textColor, maxWidth: 150 }]} numberOfLines={1}>{address}</Text>
+                </Pressable>
+                <View style={styles.statusRow}>
+                  <Users size={18} color="#22c55e" />
+                  <Text style={[styles.statusLabel, { color: textSecondary }]}>Nearby Tourists</Text>
+                  <Text style={[styles.statusValue, { color: textColor }]}>{nearbyTourists} online</Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <Phone size={18} color="#e53935" />
+                  <Text style={[styles.statusLabel, { color: textSecondary }]}>Emergency Contacts</Text>
+                  <Text style={[styles.statusValue, { color: textColor }]}>{emergencyContacts} active</Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* Alerts */}
-          <TouchableOpacity
-            style={[styles.alertsCard, { backgroundColor: cardColor, ...cardShadow }]}
-            onPress={() => setShowAlertsModal(true)}
-            activeOpacity={0.85}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Bell size={22} color="#f59e42" />
-              <Text style={[styles.alertsTitle, { color: textColor }]}>
-                Alerts
-              </Text>
-              <View style={styles.alertsBadge}>
-                <Text style={styles.alertsBadgeText}>{ALERTS.length}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {ALERTS[0].icon}
-              <View style={{ marginLeft: 10, flex: 1 }}>
-                <Text style={[styles.alertItemTitle, { color: textColor }]} numberOfLines={1}>
-                  {ALERTS[0].title}
-                </Text>
-                <Text style={[styles.alertItemDesc, { color: textSecondary }]} numberOfLines={1}>
-                  {ALERTS[0].description}
-                </Text>
-              </View>
-              <Text style={[styles.alertItemTime, { color: textSecondary }]}>
-                {ALERTS[0].time}
-              </Text>
-            </View>
+          {/* Critical Alert */}
+          <TouchableOpacity style={[styles.criticalCard, { ...cardShadow }]} activeOpacity={0.85} onPress={() => setShowAlertsModal(true)}> 
+            <Text style={styles.criticalTitle}>CRITICAL ALERT</Text>
+            <Text style={styles.criticalHeadline}>UNSAFE ZONE ENTERED</Text>
+            <Text style={styles.criticalBody}>Your current area has a high risk rating. Leave the area or use emergency options.</Text>
           </TouchableOpacity>
+
+          {/* Recent Activity */}
+          <View style={[styles.recentCard, { backgroundColor: cardColor, ...cardShadow }]}> 
+            <TouchableOpacity style={styles.recentHeader} activeOpacity={0.85} onPress={() => setShowAlertsModal(true)}>
+              <Bell size={20} color="#f59e42" />
+              <Text style={[styles.recentTitle, { color: textColor }]}>Recent Activity</Text>
+            </TouchableOpacity>
+            <View style={styles.recentItem}>
+              <View style={styles.recentDot} />
+              <Text style={[styles.recentText, { color: textColor, flex: 1 }]}>Potential Network Issue</Text>
+              <Text style={[styles.recentTime, { color: textSecondary }]}>1 min ago</Text>
+            </View>
+            <View style={styles.recentItem}>
+              <View style={styles.recentDot} />
+              <Text style={[styles.recentText, { color: textColor, flex: 1 }]}>Entered Safe Zone</Text>
+              <Text style={[styles.recentTime, { color: textSecondary }]}>Yesterday</Text>
+            </View>
+          </View>
         </ScrollView>
       )}
 
@@ -445,12 +448,12 @@ export default function Dashboard() {
           <User size={28} color={activeTab === "profile" ? iconActive : iconInactive} />
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1, paddingTop: 16, paddingHorizontal: 20, paddingBottom: 20 },
   greetingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -465,8 +468,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#dbeafe",
+    overflow: "hidden",
   },
   riskCard: {
     borderRadius: 18,
@@ -511,10 +513,86 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     flexWrap: "wrap",
   },
+  headerGradient: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  dateText: { fontSize: 12 },
+  headerGreeting: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  riskQuickWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  ringOuter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+  },
+  ringInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ringScore: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  ringLabel: {
+    fontSize: 10,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  ringMeta: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  ringMetaTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  ringMetaSub: {
+    fontSize: 12,
+  },
   statusCard: {
     borderRadius: 18,
     padding: 18,
     marginVertical: 12,
+  },
+  locationCard: {
+    borderRadius: 18,
+    padding: 14,
+    marginVertical: 12,
+  },
+  miniMap: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusTitle: { fontWeight: "bold", fontSize: 16, marginBottom: 10 },
   statusRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
@@ -525,6 +603,66 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 18,
   },
+  criticalCard: {
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: "#fee2e2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    marginBottom: 16,
+  },
+  criticalTitle: {
+    color: "#b91c1c",
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  criticalHeadline: {
+    color: "#7f1d1d",
+    fontWeight: "800",
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  criticalBody: {
+    color: "#7f1d1d",
+    fontSize: 12,
+  },
+  recentCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+  },
+  recentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8,
+  },
+  recentTitle: {
+    fontWeight: "700",
+    marginLeft: 8,
+  },
+  recentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  recentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#f59e0b",
+    marginRight: 10,
+  },
+  recentText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  recentTime: {
+    fontSize: 12,
+  },
+  avatarImage: { width: 44, height: 44, borderRadius: 22 },
   alertsTitle: { fontWeight: "bold", fontSize: 16, marginLeft: 8, flex: 1 },
   alertsBadge: {
     backgroundColor: "#fbbf24",

@@ -19,6 +19,9 @@ type MessagingContextType = {
   addEmergencyMessage: (message: Message) => void;
   addFamilyMessage: (message: Message) => void;
   addNearbyMessage: (message: Message) => void;
+  updateEmergencyMessage: (id: string, updates: Partial<Message>) => void;
+  updateFamilyMessage: (id: string, updates: Partial<Message>) => void;
+  updateNearbyMessage: (id: string, updates: Partial<Message>) => void;
   sendSOSMessages: () => void;
 };
 
@@ -42,9 +45,26 @@ const INITIAL_EMERGENCY_MESSAGES: Message[] = [
   },
 ];
 
+const INITIAL_FAMILY_MESSAGES: Message[] = [
+  {
+    id: "fam_1",
+    sender: "Mom",
+    content: "Hi beta, share your live location if you need anything.",
+    timestamp: "20:55",
+    type: "system",
+  },
+  {
+    id: "fam_2",
+    sender: "Brother",
+    content: "I'm online. Ping me here anytime.",
+    timestamp: "20:56",
+    type: "system",
+  },
+];
+
 export const MessagingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [emergencyMessages, setEmergencyMessages] = useState<Message[]>(INITIAL_EMERGENCY_MESSAGES);
-  const [familyMessages, setFamilyMessages] = useState<Message[]>([]);
+  const [familyMessages, setFamilyMessages] = useState<Message[]>(INITIAL_FAMILY_MESSAGES);
   const [nearbyMessages, setNearbyMessages] = useState<Message[]>([]);
 
   const addEmergencyMessage = (message: Message) => {
@@ -53,10 +73,125 @@ export const MessagingProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const addFamilyMessage = (message: Message) => {
     setFamilyMessages(prev => [...prev, message]);
+
+    // Simulate auto-joining/replies from family members for non-system user messages only
+    if (message.sender === "You" && message.type !== "system") {
+      const makeTimestamp = () => new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+      const isDanger = message.type === 'danger_alert' || /need\s*help|emergency|sos/i.test(message.content);
+      const isSafe = /i'?m\s*safe|i am safe|all good|safe now/i.test(message.content);
+      const isLocationShare = /live location|coordinates|📍/i.test(message.content);
+
+      if (isDanger) {
+        // Urgent responses for "I Need Help"
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_mom_danger`,
+              sender: "Mom",
+              content: "I'm here. Stay calm — I'm calling you now and alerting neighbors.",
+              timestamp: makeTimestamp(),
+              type: "system",
+            },
+          ]);
+        }, 1000);
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_bro_danger`,
+              sender: "Brother",
+              content: "I'm on my way. Sharing my live location. Keep your phone on.",
+              timestamp: makeTimestamp(),
+              type: "help_response",
+            },
+          ]);
+        }, 1600);
+      } else if (isLocationShare) {
+        // Acknowledge shared location
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_mom_loc`,
+              sender: "Mom",
+              content: "Got your location. Keeping an eye on you.",
+              timestamp: makeTimestamp(),
+              type: "system",
+            },
+          ]);
+        }, 1000);
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_bro_loc`,
+              sender: "Brother",
+              content: "Location received. I'm close by — texting you updates.",
+              timestamp: makeTimestamp(),
+              type: "help_response",
+            },
+          ]);
+        }, 1600);
+      } else if (isSafe) {
+        // Relief responses for "I'm Safe"
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_mom_safe`,
+              sender: "Mom",
+              content: "Thank God! Stay where you are — call me.",
+              timestamp: makeTimestamp(),
+              type: "system",
+            },
+          ]);
+        }, 1000);
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_bro_safe`,
+              sender: "Brother",
+              content: "Glad you're safe. Message if you need anything.",
+              timestamp: makeTimestamp(),
+              type: "system",
+            },
+          ]);
+        }, 1400);
+      } else {
+        // Generic text fallback
+        setTimeout(() => {
+          setFamilyMessages(prev => [
+            ...prev,
+            {
+              id: `${Date.now()}_mom_generic`,
+              sender: "Mom",
+              content: "I'm here. Stay calm, I'm calling you now.",
+              timestamp: makeTimestamp(),
+              type: "system",
+            },
+          ]);
+        }, 900);
+      }
+    }
   };
 
   const addNearbyMessage = (message: Message) => {
     setNearbyMessages(prev => [...prev, message]);
+  };
+
+  const updateEmergencyMessage = (id: string, updates: Partial<Message>) => {
+    setEmergencyMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const updateFamilyMessage = (id: string, updates: Partial<Message>) => {
+    setFamilyMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const updateNearbyMessage = (id: string, updates: Partial<Message>) => {
+    setNearbyMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
   const sendSOSMessages = () => {
@@ -161,6 +296,9 @@ export const MessagingProvider: React.FC<{ children: ReactNode }> = ({ children 
         addEmergencyMessage,
         addFamilyMessage,
         addNearbyMessage,
+        updateEmergencyMessage,
+        updateFamilyMessage,
+        updateNearbyMessage,
         sendSOSMessages,
       }}
     >

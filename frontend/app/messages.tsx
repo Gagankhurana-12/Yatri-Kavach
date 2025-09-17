@@ -9,6 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  SafeAreaView,
+  StatusBar,
+  Image,
 } from "react-native";
 import {
   AlertTriangle,
@@ -40,17 +43,17 @@ type NearbyPerson = {
   name: string;
   distance: string;
   status: string;
-  avatar: string;
+  avatar: string; // URL to image avatar
 };
 
 type ChatTab = "emergency" | "family" | "nearby";
 
 
-const MOCK_NEARBY_PEOPLE = [
-  { id: "1", name: "Sarah Chen", distance: "0.2 km", status: "online", avatar: "👩" },
-  { id: "2", name: "Mike Rodriguez", distance: "0.5 km", status: "online", avatar: "👨" },
-  { id: "3", name: "Priya Sharma", distance: "0.8 km", status: "online", avatar: "👩" },
-  { id: "4", name: "David Kim", distance: "1.2 km", status: "online", avatar: "👨" },
+const MOCK_NEARBY_PEOPLE: NearbyPerson[] = [
+  { id: "1", name: "Sarah Chen", distance: "0.2 km", status: "online", avatar: "https://i.pravatar.cc/96?img=47" },
+  { id: "2", name: "Mike Rodriguez", distance: "0.5 km", status: "online", avatar: "https://i.pravatar.cc/96?img=12" },
+  { id: "3", name: "Priya Sharma", distance: "0.8 km", status: "online", avatar: "https://i.pravatar.cc/96?img=65" },
+  { id: "4", name: "David Kim", distance: "1.2 km", status: "online", avatar: "https://i.pravatar.cc/96?img=33" },
 ];
 
 const DANGER_ALERTS: Message[] = [
@@ -76,7 +79,10 @@ export default function Messages() {
     nearbyMessages, 
     addEmergencyMessage, 
     addFamilyMessage, 
-    addNearbyMessage 
+    addNearbyMessage,
+    updateEmergencyMessage,
+    updateFamilyMessage,
+    updateNearbyMessage,
   } = useMessaging();
   const isDark = theme === "dark";
   const [activeTab, setActiveTab] = useState<ChatTab>("emergency");
@@ -94,7 +100,7 @@ export default function Messages() {
   const inputBg = isDark ? "#262626" : "#f3f4f6";
   const borderColor = isDark ? "#374151" : "#e5e7eb";
   const emergencyColor = "#dc2626";
-  const safeColor = "#059669";
+  const safeColor = "#34d399"; // lighter green
   const activeTabColor = isDark ? "#374151" : "#3b82f6";
 
   useEffect(() => {
@@ -193,8 +199,8 @@ export default function Messages() {
       // Show success feedback
       Alert.alert("Location Shared", "Your live location has been shared successfully!");
       
-      // Add monitoring response after location is shared (only for Emergency and Family tabs)
-      if (activeTab !== "nearby") {
+      // Add monitoring response ONLY for Emergency tab (not Family or Nearby)
+      if (activeTab === "emergency") {
         setTimeout(() => {
           const monitoringResponse: Message = {
             id: (Date.now() + 2).toString(),
@@ -208,11 +214,7 @@ export default function Messages() {
             type: "emergency",
           };
           
-          if (activeTab === "emergency") {
-            addEmergencyMessage(monitoringResponse);
-          } else if (activeTab === "family") {
-            addFamilyMessage(monitoringResponse);
-          }
+          addEmergencyMessage(monitoringResponse);
         }, 1000);
       } else {
         // Nearby people responses when location is shared in Nearby tab
@@ -282,8 +284,9 @@ export default function Messages() {
     setIsInDanger(true);
     
     // Show immediate emergency message - no delay
+    const initialId = Date.now().toString();
     const dangerMessage: Message = {
-      id: Date.now().toString(),
+      id: initialId,
       sender: user?.userName || "You",
       userName: user?.userName || "Tourist in Distress",
       content: "🚨 EMERGENCY: I need immediate help! I'm in danger and require assistance.",
@@ -402,21 +405,18 @@ export default function Messages() {
       });
       
       // Update the message with actual location
-      const updatedMessage: Message = {
-        ...dangerMessage,
-        id: (Date.now() + 1).toString(),
+      const updatedFields = {
         location: `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`,
-        content: "🚨 EMERGENCY: I need immediate help! I'm in danger and require assistance.",
-      };
-      
-      // Add updated message with location (context will handle the update)
+      } as Partial<Message>;
+
+      // Update the existing message with location instead of adding a new one
       if (activeTab === "emergency") {
-        addEmergencyMessage(updatedMessage);
-        addNearbyMessage(updatedMessage);
+        updateEmergencyMessage(initialId, updatedFields);
+        updateNearbyMessage(initialId, updatedFields);
       } else if (activeTab === "family") {
-        addFamilyMessage(updatedMessage);
+        updateFamilyMessage(initialId, updatedFields);
       } else if (activeTab === "nearby") {
-        addNearbyMessage(updatedMessage);
+        updateNearbyMessage(initialId, updatedFields);
       }
       
     } catch (error) {
@@ -450,15 +450,25 @@ export default function Messages() {
 
     if (isDangerAlert && !isOwnMessage) {
       return (
-        <View key={message.id} style={[styles.dangerAlertContainer, { borderColor: emergencyColor }]}>
+        <View 
+          key={`${message.id}_${message.timestamp}_${message.sender}`}
+          style={[
+            styles.dangerAlertContainer, 
+            { 
+              backgroundColor: isDark ? "#7f1d1d" : "#fee2e2",
+              borderColor: isDark ? "#ef4444" : "#fecaca",
+              borderLeftColor: "#ef4444",
+            }
+          ]}
+        >
           <View style={styles.dangerAlertHeader}>
-            <Text style={[styles.dangerAlertTitle, { color: emergencyColor }]}>🚨 EMERGENCY ALERT</Text>
+            <Text style={[styles.dangerAlertTitle, { color: isDark ? "#fecaca" : "#b91c1c" }]}>🚨 EMERGENCY ALERT</Text>
             <Text style={[styles.dangerAlertDistance, { color: textSecondary }]}>{message.distance}</Text>
           </View>
-          <Text style={[styles.dangerAlertUser, { color: textColor }]}>{message.userName}</Text>
-          <Text style={[styles.dangerAlertContent, { color: textColor }]}>{message.content}</Text>
+          <Text style={[styles.dangerAlertUser, { color: isDark ? "#ffffff" : textColor }]}>{message.userName}</Text>
+          <Text style={[styles.dangerAlertContent, { color: isDark ? "#ffffff" : textColor }]}>{message.content}</Text>
           {message.location && (
-            <Text style={[styles.dangerAlertLocation, { color: textSecondary }]}>📍 {message.location}</Text>
+            <Text style={[styles.dangerAlertLocation, { color: isDark ? "#fecaca" : textSecondary }]}>📍 {message.location}</Text>
           )}
           <View style={styles.dangerAlertActions}>
             <TouchableOpacity 
@@ -468,7 +478,7 @@ export default function Messages() {
               <Text style={styles.helpButtonText}>🤝 I'll Help</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.shareLocationButton, { backgroundColor: "#3b82f6" }]}
+              style={[styles.shareLocationButton, { backgroundColor: "#2563eb" }]}
               onPress={shareLocation}
             >
               <Text style={styles.helpButtonText}>📍 Share Location</Text>
@@ -482,7 +492,7 @@ export default function Messages() {
     }
 
     return (
-      <View key={message.id} style={styles.messageContainer}>
+      <View key={`${message.id}_${message.timestamp}_${message.sender}`} style={styles.messageContainer}>
         {!isOwnMessage && (
           <Text style={[styles.senderName, { color: textSecondary }]}>
             {message.sender}
@@ -492,23 +502,23 @@ export default function Messages() {
           style={[
             styles.messageBubble,
             {
-              backgroundColor: isEmergency
-                ? emergencyColor
-                : isDangerAlert
-                ? "#fbbf24"
-                : isHelpResponse
-                ? safeColor
+              backgroundColor: (isEmergency || isDangerAlert)
+                ? (isDark ? "#7f1d1d" : "#fee2e2")
                 : isOwnMessage
-                ? (isDark ? "#374151" : "#3b82f6")
-                : (isDark ? "#262626" : "#f3f4f6"),
+                ? (isDark ? "#1d4ed8" : "#2563eb")
+                : "#ffffff",
               alignSelf: isOwnMessage ? "flex-end" : "flex-start",
               maxWidth: "80%",
-              borderColor: isOwnMessage ? "transparent" : borderColor,
+              borderColor: (isEmergency || isDangerAlert)
+                ? "#ef4444"
+                : (isOwnMessage ? "transparent" : borderColor),
             },
           ]}
         >
           <Text style={[styles.messageText, { 
-            color: (isEmergency || isDangerAlert || isHelpResponse || (isOwnMessage && !isDark)) ? "#ffffff" : textColor 
+            color: (isEmergency || isDangerAlert)
+              ? (isDark ? "#ffffff" : "#991b1b")
+              : (isOwnMessage ? "#ffffff" : textColor)
           }]}>
             {message.content}
           </Text>
@@ -526,10 +536,16 @@ export default function Messages() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor }}>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={backgroundColor}
+        translucent={false}
+      />
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: borderColor }]}>
         <Text style={[styles.headerTitle, { color: textColor }]}>
@@ -627,7 +643,7 @@ export default function Messages() {
             </Text>
             {nearbyPeople.map((person) => (
               <View key={person.id} style={[styles.nearbyPersonCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
-                <Text style={styles.personAvatar}>{person.avatar}</Text>
+                <Image source={{ uri: person.avatar }} style={styles.personAvatarImage} />
                 <View style={styles.personInfo}>
                   <Text style={[styles.personName, { color: textColor }]}>{person.name}</Text>
                   <Text style={[styles.personDistance, { color: textSecondary }]}>{person.distance} away</Text>
@@ -643,24 +659,39 @@ export default function Messages() {
 
       {/* Action Buttons */}
       <View style={[styles.actionButtons, { backgroundColor: cardColor, borderTopColor: borderColor }]}>
+        {/* I Need Help */}
         <TouchableOpacity
           style={[
             styles.actionButton,
             { 
-              backgroundColor: isInDanger ? emergencyColor : (isDark ? "#374151" : "#6b7280"),
-              borderColor: borderColor
+              backgroundColor: "#f87171", // light red
+              borderColor: "#f87171"
             }
           ]}
-          onPress={isInDanger ? shareLocation : broadcastDangerAlert}
-          activeOpacity={0.6}
-          disabled={false}
+          onPress={broadcastDangerAlert}
+          activeOpacity={0.8}
         >
-          <MapPin size={16} color="#ffffff" />
-          <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>
-            {isInDanger ? "Share Live Location" : "🚨 I Need Help"}
-          </Text>
+          <AlertTriangle size={16} color="#ffffff" />
+          <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>I Need Help</Text>
         </TouchableOpacity>
 
+        {/* Share Live Location */}
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            { 
+              backgroundColor: "#60a5fa", // light blue
+              borderColor: "#60a5fa"
+            }
+          ]}
+          onPress={shareLocation}
+          activeOpacity={0.8}
+        >
+          <MapPin size={16} color="#ffffff" />
+          <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>Share Location</Text>
+        </TouchableOpacity>
+
+        {/* I'm Safe */}
         <TouchableOpacity
           style={[
             styles.actionButton, 
@@ -670,11 +701,10 @@ export default function Messages() {
             }
           ]}
           onPress={sendSafeStatus}
+          activeOpacity={0.8}
         >
           <CheckCircle size={16} color="#ffffff" />
-          <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>
-            I'm Safe
-          </Text>
+          <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>I'm Safe</Text>
         </TouchableOpacity>
       </View>
 
@@ -700,7 +730,7 @@ export default function Messages() {
           style={[
             styles.sendButton,
             { 
-              backgroundColor: inputText.trim() ? "#3b82f6" : (isDark ? "#374151" : "#d1d5db"),
+              backgroundColor: inputText.trim() ? "#60a5fa" : (isDark ? "#374151" : "#d1d5db"),
               opacity: inputText.trim() ? 1 : 0.6
             },
           ]}
@@ -710,7 +740,8 @@ export default function Messages() {
           <Send size={18} color={inputText.trim() ? "#ffffff" : textSecondary} />
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -914,6 +945,13 @@ const styles = StyleSheet.create({
   personAvatar: {
     fontSize: 24,
     marginRight: 12,
+  },
+  personAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    backgroundColor: '#e5e7eb',
   },
   personInfo: {
     flex: 1,

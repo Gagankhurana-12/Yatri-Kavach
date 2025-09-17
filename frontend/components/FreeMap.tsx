@@ -4,12 +4,16 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { MapPin, RotateCcw, Navigation, Zap } from 'lucide-react-native';
 import { useTheme } from './ThemeContext';
+import { useLocationContext } from './LocationContext';
+import { SERVER_URL } from '@/constants/config';
+import { usePush } from './PushContext';
 
 interface FreeMapProps {
   style?: any;
+  compact?: boolean; // hide overlay controls for small embeds
 }
 
-export default function FreeMap({ style }: FreeMapProps) {
+export default function FreeMap({ style, compact = false }: FreeMapProps) {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [address, setAddress] = useState("Getting location...");
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +30,8 @@ export default function FreeMap({ style }: FreeMapProps) {
   const previousLocation = useRef<{ latitude: number; longitude: number; timestamp: number } | null>(null);
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { setCoords } = useLocationContext();
+  const { pushToken } = usePush();
 
   const startRealTimeTracking = async () => {
     try {
@@ -87,6 +93,24 @@ export default function FreeMap({ style }: FreeMapProps) {
           
           // Update location data without speed calculations
           setLocation(newLocation);
+          setCoords({
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            accuracy: loc.coords.accuracy || 0,
+            heading: loc.coords.heading || 0,
+            altitude: loc.coords.altitude || 0,
+            timestamp: Date.now(),
+          });
+          // Update server with latest location (best-effort)
+          try {
+            if (pushToken) {
+              fetch(`${SERVER_URL}/updateLocation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: pushToken, lat: newLocation.latitude, lng: newLocation.longitude }),
+              }).catch(() => {});
+            }
+          } catch {}
           setAccuracy(loc.coords.accuracy || 0);
           setHeading(loc.coords.heading || 0);
           setAltitude(loc.coords.altitude || 0);
@@ -521,30 +545,28 @@ export default function FreeMap({ style }: FreeMapProps) {
         startInLoadingState={true}
         scalesPageToFit={true}
         scrollEnabled={false}
-        onMessage={(event) => {
-          // Handle messages from WebView if needed
-        }}
       />
-      
-      {/* Live Tracking Controls */}
-      <View style={styles.controlsContainer}>
-        <View style={[styles.statusIndicator, { backgroundColor: cardColor }]}>
-          <View style={[styles.liveIndicator, { backgroundColor: isTracking ? '#22c55e' : '#ef4444' }]} />
-          <Text style={[styles.statusText, { color: textColor }]}>
-            {isTracking ? 'LIVE' : 'OFFLINE'}
-          </Text>
-          <Text style={[styles.speedText, { color: textSecondary }]}>
-            {(speed * 3.6).toFixed(1)} km/h | {heading.toFixed(0)}°
-          </Text>
+
+      {!compact && (
+        <View style={styles.controlsContainer}>
+          <View style={[styles.statusIndicator, { backgroundColor: cardColor }]}> 
+            <View style={[styles.liveIndicator, { backgroundColor: isTracking ? '#22c55e' : '#ef4444' }]} />
+            <Text style={[styles.statusText, { color: textColor }]}> 
+              {isTracking ? 'LIVE' : 'OFFLINE'}
+            </Text>
+            <Text style={[styles.speedText, { color: textSecondary }]}> 
+              {(speed * 3.6).toFixed(1)} km/h | {heading.toFixed(0)}°
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={[styles.trackingButton, { backgroundColor: isTracking ? '#ef4444' : '#22c55e' }]} 
+            onPress={isTracking ? stopTracking : startRealTimeTracking}
+          >
+            {isTracking ? <MapPin size={20} color="#fff" /> : <Navigation size={20} color="#fff" />}
+          </TouchableOpacity>
         </View>
-        
-        <TouchableOpacity 
-          style={[styles.trackingButton, { backgroundColor: isTracking ? '#ef4444' : '#22c55e' }]} 
-          onPress={isTracking ? stopTracking : startRealTimeTracking}
-        >
-          {isTracking ? <MapPin size={20} color="#fff" /> : <Navigation size={20} color="#fff" />}
-        </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 }

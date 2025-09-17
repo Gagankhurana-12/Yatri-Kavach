@@ -11,6 +11,8 @@ import {
   Pressable,
   Dimensions,
   Linking,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import {
   Phone,
@@ -29,6 +31,9 @@ import {
 import { useTheme } from "../components/ThemeContext";
 import { useMessaging } from "../components/MessagingContext";
 import { router } from "expo-router";
+import { useLocationContext } from "../components/LocationContext";
+import { usePush } from "../components/PushContext";
+import { SERVER_URL } from "@/constants/config";
 
 const { width, height } = Dimensions.get("window");
 
@@ -40,47 +45,32 @@ export default function Emergency({ onNavigateToMessages }: EmergencyProps = {})
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { sendSOSMessages } = useMessaging();
+  const { coords } = useLocationContext();
+  const { presentLocal } = usePush();
   const [showOverlay, setShowOverlay] = useState(false);
   const [escalate, setEscalate] = useState(false);
   const [countdown, setCountdown] = useState(10);
-  const [sosCountdown, setSosCountdown] = useState<number | null>(null);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const timerRef = useRef<number | null>(null);
   const sosTimerRef = useRef<number | null>(null);
 
-  // Handle long press for SOS
-  const handleSOSLongPress = () => {
-    setSosCountdown(3);
-    let i = 3;
-    sosTimerRef.current = setInterval(() => {
-      i = i - 1;
-      setSosCountdown(i);
-      if (i === 0) {
-        clearInterval(sosTimerRef.current!);
-        setSosCountdown(null);
-        setShowOverlay(true);
-        setEscalate(true);
-        setCountdown(10);
-        // Start escalation countdown
-        let j = 10;
-        timerRef.current = setInterval(() => {
-          j = j - 1;
-          setCountdown(j);
-          if (j === 0) {
-            clearInterval(timerRef.current!);
-            // Auto-send emergency messages to all channels
-            sendEmergencyMessages();
-          }
-        }, 1000) as unknown as number;
+  // SMS-based nearby notifications removed per user request
+
+  // Single tap to start 10s escalation
+  const handleSOSPress = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setShowOverlay(true);
+    setEscalate(true);
+    setCountdown(10);
+    let j = 10;
+    timerRef.current = setInterval(() => {
+      j = j - 1;
+      setCountdown(j);
+      if (j === 0) {
+        clearInterval(timerRef.current!);
+        sendEmergencyMessages();
       }
     }, 1000) as unknown as number;
-  };
-
-  const handleSOSRelease = () => {
-    if (!showOverlay && sosTimerRef.current) {
-      clearInterval(sosTimerRef.current);
-      setSosCountdown(null);
-    }
   };
 
   // Function to send emergency messages to all channels
@@ -96,6 +86,29 @@ export default function Emergency({ onNavigateToMessages }: EmergencyProps = {})
       // Show tracking modal
       setShowTrackingModal(true);
       
+      // Local in-app notification
+      presentLocal(
+        "🚨 SOS Alert Sent",
+        "Your emergency alert has been dispatched to services and nearby users."
+      );
+
+      // Broadcast push to nearby devices via server (best-effort)
+      try {
+        if (coords?.latitude && coords?.longitude) {
+          await fetch(`${SERVER_URL}/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lat: coords.latitude,
+              lng: coords.longitude,
+              radius: 500,
+              title: '🚨 Nearby SOS',
+              body: 'Someone near you needs help. Tap to open the app.',
+            }),
+          });
+        }
+      } catch {}
+
       // Auto-close tracking modal and navigate to messages
       setTimeout(() => {
         setShowTrackingModal(false);
@@ -145,28 +158,23 @@ export default function Emergency({ onNavigateToMessages }: EmergencyProps = {})
   );
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: isDark ? "#181c20" : "#fff" }]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? "#181c20" : "#fff" }}>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={isDark ? "#181c20" : "#fff"}
+        translucent={false}
+      />
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: isDark ? "#181c20" : "#fff" }]}>
       <Text style={[styles.title, { color: isDark ? "#fff" : "#181c20" }]} numberOfLines={1}>Emergency</Text>
-      <Text style={[styles.subtitle, { color: isDark ? "#ccc" : "#555" }]}>
-        Press and hold SOS for emergency
-      </Text>
+      <Text style={[styles.subtitle, { color: isDark ? "#ccc" : "#555" }]}>Tap SOS to start 10s escalation</Text>
       <Pressable
-        onPressIn={handleSOSLongPress}
-        onPressOut={handleSOSRelease}
+        onPress={handleSOSPress}
         style={styles.sosCircle}
       >
         <AlertTriangle size={56} color="#fff" />
         <Text style={styles.sosText}>SOS</Text>
-        {/* Animated 3-2-1 countdown */}
-        {sosCountdown !== null && sosCountdown > 0 && (
-          <View style={styles.countdownOverlay}>
-            <Text style={styles.countdownText}>{sosCountdown}</Text>
-          </View>
-        )}
       </Pressable>
-      <Text style={[styles.sosHoldText, { color: isDark ? "#ccc" : "#555" }]}>
-        Press and hold for 3 seconds to trigger emergency alert
-      </Text>
+      <Text style={[styles.sosHoldText, { color: isDark ? "#ccc" : "#555" }]}>Escalates automatically if not cancelled</Text>
       <Text style={[styles.sectionTitle, { color: isDark ? "#fff" : "#181c20" }]}>Emergency Types</Text>
       <View style={styles.typeRow}>
         <View style={[styles.typeCard, { backgroundColor: isDark ? "#23272f" : "#fff6f6" }]}>
@@ -184,45 +192,72 @@ export default function Emergency({ onNavigateToMessages }: EmergencyProps = {})
       </View>
       <Text style={[styles.sectionTitle, { color: isDark ? "#fff" : "#181c20" }]}>Emergency Contacts</Text>
       <View style={[styles.contactCard, { backgroundColor: isDark ? "#23272f" : "#fff" }]}>
+        {/* Mom */}
         <TouchableOpacity
-          onPress={() => Linking.openURL("tel:+15550123")}
-          style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}
-          activeOpacity={0.7}
+          onPress={() => Linking.openURL("tel:+919812345678")}
+          style={styles.contactRow}
+          activeOpacity={0.8}
         >
-          <Phone size={20} color="#2563eb" />
-          <Text style={{ marginLeft: 8, color: isDark ? "#fff" : "#181c20", fontWeight: "bold" }}>Mom</Text>
+          <View style={styles.contactLeft}>
+            <Phone size={20} color="#2563eb" />
+            <View style={styles.contactTextWrap}>
+              <Text style={[styles.contactName, { color: isDark ? "#fff" : "#181c20" }]}>Mom</Text>
+              <Text style={[styles.contactMeta, { color: isDark ? "#9ca3af" : "#6b7280" }]}>Mother</Text>
+            </View>
+          </View>
+          <Text style={[styles.contactNumber, { color: isDark ? "#cbd5e1" : "#334155" }]}>+91 98123 45678</Text>
         </TouchableOpacity>
-        <Text style={{ color: "#aaa", marginBottom: 6 }}>Mother • +1-555-0123</Text>
+        <View style={[styles.contactDivider, { backgroundColor: isDark ? "#2f3540" : "#e5e7eb" }]} />
 
+        {/* Police */}
         <TouchableOpacity
           onPress={() => Linking.openURL("tel:100")}
-          style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}
-          activeOpacity={0.7}
+          style={styles.contactRow}
+          activeOpacity={0.8}
         >
-          <Phone size={20} color="#2563eb" />
-          <Text style={{ marginLeft: 8, color: isDark ? "#fff" : "#181c20", fontWeight: "bold" }}>Police</Text>
+          <View style={styles.contactLeft}>
+            <Phone size={20} color="#2563eb" />
+            <View style={styles.contactTextWrap}>
+              <Text style={[styles.contactName, { color: isDark ? "#fff" : "#181c20" }]}>Police</Text>
+              <Text style={[styles.contactMeta, { color: isDark ? "#9ca3af" : "#6b7280" }]}>Emergency</Text>
+            </View>
+          </View>
+          <Text style={[styles.contactNumber, { color: isDark ? "#cbd5e1" : "#334155" }]}>100</Text>
         </TouchableOpacity>
-        <Text style={{ color: "#aaa", marginBottom: 6 }}>100</Text>
+        <View style={[styles.contactDivider, { backgroundColor: isDark ? "#2f3540" : "#e5e7eb" }]} />
 
+        {/* Ambulance */}
         <TouchableOpacity
           onPress={() => Linking.openURL("tel:102")}
-          style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}
-          activeOpacity={0.7}
+          style={styles.contactRow}
+          activeOpacity={0.8}
         >
-          <Phone size={20} color="#2563eb" />
-          <Text style={{ marginLeft: 8, color: isDark ? "#fff" : "#181c20", fontWeight: "bold" }}>Ambulance</Text>
+          <View style={styles.contactLeft}>
+            <Phone size={20} color="#2563eb" />
+            <View style={styles.contactTextWrap}>
+              <Text style={[styles.contactName, { color: isDark ? "#fff" : "#181c20" }]}>Ambulance</Text>
+              <Text style={[styles.contactMeta, { color: isDark ? "#9ca3af" : "#6b7280" }]}>Medical</Text>
+            </View>
+          </View>
+          <Text style={[styles.contactNumber, { color: isDark ? "#cbd5e1" : "#334155" }]}>102</Text>
         </TouchableOpacity>
-        <Text style={{ color: "#aaa", marginBottom: 6 }}>102</Text>
+        <View style={[styles.contactDivider, { backgroundColor: isDark ? "#2f3540" : "#e5e7eb" }]} />
 
+        {/* Fire */}
         <TouchableOpacity
           onPress={() => Linking.openURL("tel:101")}
-          style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}
-          activeOpacity={0.7}
+          style={styles.contactRow}
+          activeOpacity={0.8}
         >
-          <Phone size={20} color="#2563eb" />
-          <Text style={{ marginLeft: 8, color: isDark ? "#fff" : "#181c20", fontWeight: "bold" }}>Fire</Text>
+          <View style={styles.contactLeft}>
+            <Phone size={20} color="#2563eb" />
+            <View style={styles.contactTextWrap}>
+              <Text style={[styles.contactName, { color: isDark ? "#fff" : "#181c20" }]}>Fire</Text>
+              <Text style={[styles.contactMeta, { color: isDark ? "#9ca3af" : "#6b7280" }]}>Rescue</Text>
+            </View>
+          </View>
+          <Text style={[styles.contactNumber, { color: isDark ? "#cbd5e1" : "#334155" }]}>101</Text>
         </TouchableOpacity>
-        <Text style={{ color: "#aaa" }}>101</Text>
       </View>
       
       {/* E-FIR Button */}
@@ -286,7 +321,8 @@ export default function Emergency({ onNavigateToMessages }: EmergencyProps = {})
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -362,6 +398,35 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
     shadowRadius: 6,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  contactLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  contactTextWrap: {
+    marginLeft: 8,
+  },
+  contactName: {
+    fontWeight: 'bold',
+  },
+  contactMeta: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  contactNumber: {
+    fontWeight: '600',
+  },
+  contactDivider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 6,
   },
   // Final escalation overlay styles
   overlayContainer: {

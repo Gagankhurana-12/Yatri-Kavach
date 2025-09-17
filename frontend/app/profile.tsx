@@ -9,7 +9,9 @@ import {
   StatusBar,
   Platform,
   Modal,
-  FlatList
+  FlatList,
+  SafeAreaView,
+  Image
 } from "react-native";
 import { 
   ArrowLeft, 
@@ -47,10 +49,11 @@ const Profile = () => {
   const borderColor = isDark ? "#374151" : "#e5e7eb";
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor }]}>
       <StatusBar 
         barStyle={isDark ? "light-content" : "dark-content"} 
-        backgroundColor={backgroundColor} 
+        backgroundColor={backgroundColor}
+        translucent={false}
       />
       
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -69,22 +72,27 @@ const Profile = () => {
 
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: cardBackground }]}>
-          <View style={styles.profileInfo}>
-            <Text style={[styles.userName, { color: textPrimary }]}>
-              {user?.userName || "Shu"}
-            </Text>
-            <Text style={[styles.userId, { color: textSecondary }]}>
-              ID: 1234567890
-            </Text>
-            <View style={styles.emergencyRow}>
-              <Phone size={16} color="#dc2626" />
-              <Text style={styles.emergencyText}>
-                Emergency Contact: +91 9876543210
-              </Text>
+          <View style={styles.cardRow}>
+            <View style={[styles.avatarContainer, { backgroundColor: isDark ? "#374151" : "#f3f4f6" }]}> 
+              <Image 
+                source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }} 
+                style={{ width: 72, height: 72, borderRadius: 36 }}
+              />
             </View>
-          </View>
-          <View style={[styles.avatarContainer, { backgroundColor: isDark ? "#374151" : "#f3f4f6" }]}>
-            <User size={32} color={textSecondary} />
+            <View style={styles.profileInfo}>
+              <Text style={[styles.userName, { color: textPrimary }]}>
+                {user?.userName || "Shu"}
+              </Text>
+              <Text style={[styles.userId, { color: textSecondary }]}>
+                ID: 1234567890
+              </Text>
+              <View style={styles.emergencyRow}>
+                <Phone size={16} color="#dc2626" />
+                <Text style={styles.emergencyText}>
+                  Emergency Contact: +91 9876543210
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -230,7 +238,7 @@ const Profile = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -239,7 +247,7 @@ export default Profile;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "ios" ? 50 : 40,
+    paddingTop: Platform.OS === "ios" ? 10 : 8,
   },
   header: {
     flexDirection: "row",
@@ -257,9 +265,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   profileCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
     marginHorizontal: 20,
     marginBottom: 24,
     padding: 20,
@@ -270,8 +275,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   profileInfo: {
     flex: 1,
+    marginLeft: 14,
   },
   userName: {
     fontSize: 24,
@@ -294,12 +304,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   avatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 16,
+    overflow: "hidden",
   },
   settingsContainer: {
     marginHorizontal: 20,
