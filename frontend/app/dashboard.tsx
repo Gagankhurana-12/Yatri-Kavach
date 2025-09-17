@@ -217,12 +217,12 @@ export default function Dashboard() {
               <View style={[styles.ringOuter, { borderColor: riskCircle }]}> 
                 <View style={styles.ringInner}>
                   <Text style={[styles.ringScore, { color: riskCircle }]}>{riskScore}</Text>
-                  <Text style={styles.ringLabel}>Risk</Text>
+                  <Text style={styles.ringLabel}>Score</Text>
                 </View>
               </View>
               <View style={styles.ringMeta}>
                 <Text style={[styles.ringMetaTitle, { color: textColor }]}>Risk Score</Text>
-                <Text style={[styles.ringMetaSub, { color: textSecondary }]}>{getRiskLevel(riskScore).toUpperCase()} RISK, tap for details</Text>
+                <Text style={[styles.ringMetaSub, { color: textSecondary }]}>{getRiskLevel(riskScore).toUpperCase()}, tap for details</Text>
               </View>
             </TouchableOpacity>
           </LinearGradient>

@@ -36,20 +36,25 @@ interface RiskFactor {
 export default function RiskMonitoring() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { riskScore, riskFactors, refreshRiskScore, getRiskColor, getRiskLevel } = useRiskScore();
+  const { riskScore, riskFactors, getRiskColor, getRiskLevel, refreshRiskScore } = useRiskScore();
   const isDark = theme === "dark";
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  const refreshRiskData = async () => {
-    setIsRefreshing(true);
-    
-    // Use the shared context refresh function
-    await refreshRiskScore();
-    
+  // Update the last updated timestamp whenever the risk score changes
+  useEffect(() => {
     setLastUpdated(new Date());
-    setIsRefreshing(false);
+  }, [riskScore]);
+
+  const refreshRiskData = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshRiskScore();
+      setLastUpdated(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
 
@@ -77,21 +82,26 @@ export default function RiskMonitoring() {
             <Text style={styles.headerSubtitle}>Real-time safety assessment</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          onPress={refreshRiskData} 
-          style={[styles.refreshButton, { opacity: isRefreshing ? 0.6 : 1 }]}
-          disabled={isRefreshing}
-        >
-          <RefreshCw size={20} color="#fff" style={{ transform: [{ rotate: isRefreshing ? '180deg' : '0deg' }] }} />
-        </TouchableOpacity>
+        {/* Removed manual refresh button to simplify header UI */}
       </View>
 
       <View style={styles.content}>
         {/* Current Risk Score */}
         <View style={[styles.riskScoreCard, { backgroundColor: isDark ? "#23272f" : "#fff" }]}>
-          <Text style={[styles.cardTitle, { color: isDark ? "#fff" : "#181c20" }]}>
-            Current Risk Assessment
-          </Text>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardTitle, { color: isDark ? "#fff" : "#181c20" }]}>
+              Current Risk Assessment
+            </Text>
+            <TouchableOpacity 
+              onPress={refreshRiskData}
+              style={[styles.refreshButton, { opacity: isRefreshing ? 0.6 : 1 }]}
+              disabled={isRefreshing}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh risk score"
+            >
+              <RefreshCw size={20} color={isDark ? "#e5e7eb" : "#111827"} style={{ transform: [{ rotate: isRefreshing ? '180deg' : '0deg' }] }} />
+            </TouchableOpacity>
+          </View>
           <View style={styles.riskScoreContainer}>
             <View style={[styles.riskCircle, { borderColor: getRiskColor(riskScore) }]}>
               <Text style={[styles.riskScoreText, { color: getRiskColor(riskScore) }]}>
@@ -295,6 +305,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 0,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 16,
   },
   riskScoreContainer: {
